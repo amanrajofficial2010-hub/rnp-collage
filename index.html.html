@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AI-assisted Cisco Packet Tracer troubleshooting and human review dashboard">
+  <title>NetMentor AI — Packet Tracer Troubleshooter</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --bg: #07101f;
+      --panel: rgba(14, 27, 48, .84);
+      --panel-2: #101e34;
+      --line: rgba(150, 174, 211, .16);
+      --text: #f4f8ff;
+      --muted: #91a3bd;
+      --primary: #7367ff;
+      --cyan: #19c7d5;
+      --green: #36d399;
+      --yellow: #fbbf24;
+      --red: #fb7185;
+      --shadow: 0 24px 70px rgba(0, 0, 0, .35);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 85% 0%, rgba(24, 199, 213, .11), transparent 28rem),
+        radial-gradient(circle at 25% 18%, rgba(115, 103, 255, .12), transparent 35rem),
+        var(--bg);
+      color: var(--text);
+      font: 14px/1.5 Inter, sans-serif;
+      min-height: 100vh;
+    }
+
+    button, input, textarea, select { font: inherit; }
+    button { cursor: pointer; }
+    a { color: inherit; text-decoration: none; }
+    ::selection { background: rgba(115, 103, 255, .45); }
+
+    .app { min-height: 100vh; }
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; width: 250px; padding: 24px 18px;
+      border-right: 1px solid var(--line); background: rgba(7, 16, 31, .88);
+      backdrop-filter: blur(18px); z-index: 20;
+      display: flex; flex-direction: column;
+    }
+
+    .brand { display: flex; gap: 12px; align-items: center; padding: 4px 8px 26px; }
+    .logo {
+      width: 42px; height: 42px; border-radius: 13px;
+      background: linear-gradient(135deg, var(--primary), var(--cyan));
+      display: grid; place-items: center; box-shadow: 0 10px 30px rgba(85, 103, 255, .35);
+      font-weight: 900; font-size: 20px;
+    }
+    .brand strong { font-size: 17px; display: block; }
+    .brand small { color: var(--muted); }
+
+    .nav-title {
+      color: #657892; font-size: 10px; font-weight: 800; letter-spacing: .14em;
+      text-transform: uppercase; padding: 10px 12px;
+    }
+    .nav { display: grid; gap: 5px; }
+    .nav button {
+      border: 0; color: var(--muted); background: transparent; padding: 12px;
+      border-radius: 11px; text-align: left; display: flex; align-items: center; gap: 11px;
+      transition: .2s;
+    }
+    .nav button:hover, .nav button.active {
+      color: white; background: linear-gradient(90deg, rgba(115,103,255,.2), rgba(25,199,213,.06));
+    }
+    .nav button.active { box-shadow: inset 3px 0 var(--primary); }
+    .nav svg { width: 18px; }
+    .sidebar-footer {
+      margin-top: auto; padding: 14px; border: 1px solid var(--line); border-radius: 14px;
+      background: rgba(255,255,255,.025);
+    }
+    .review-state { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 5px rgba(54,211,153,.1); }
+    .sidebar-footer p { color: var(--muted); font-size: 11px; margin: 8px 0 0; }
+
+    main { margin-left: 250px; min-height: 100vh; }
+    .topbar {
+      height: 76px; padding: 0 34px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid var(--line); background: rgba(7, 16, 31, .66);
+      backdrop-filter: blur(16px); position: sticky; top: 0; z-index: 15;
+    }
+    .topbar h1 { margin: 0; font-size: 17px; }
+    .topbar p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+    .top-actions { display: flex; gap: 10px; align-items: center; }
+    .ai-status { color: var(--green); font-size: 12px; display: flex; gap: 7px; align-items: center; }
+
+    .avatar {
+      width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--line);
+      display: grid; place-items: center; background: linear-gradient(145deg, #243452, #121c30);
+      font-weight: 700;
+    }
+    .mobile-menu { display: none; border: 0; background: transparent; color: white; font-size: 22px; }
+
+    .content { padding: 30px 34px 60px; max-width: 1560px; margin: auto; }
+    .view { display: none; animation: appear .3s ease; }
+    .view.active { display: block; }
+    @keyframes appear { from { opacity: 0; transform: translateY(5px); } }
+
+    .hero {
+      padding: 28px; border: 1px solid var(--line); border-radius: 22px; overflow: hidden;
+      background:
+        linear-gradient(120deg, rgba(115,103,255,.14), rgba(25,199,213,.06)),
+        var(--panel);
+      box-shadow: var(--shadow); position: relative; margin-bottom: 24px;
+    }
+    .hero:after {
+      content: ""; position: absolute; width: 320px; height: 320px; border: 1px solid rgba(25,199,213,.12);
+      border-radius: 50%; top: -220px; right: -20px; box-shadow: 0 0 0 55px rgba(115,103,255,.035);
+    }
+    .eyebrow { color: var(--cyan); font-size: 11px; letter-spacing: .14em; font-weight: 800; text-transform: uppercase; }
+    .hero h2 { font-size: clamp(24px, 4vw, 38px); line-height: 1.18; max-width: 770px; margin: 10px 0; }
+    .hero p { color: var(--muted); max-width: 750px; margin: 0; }
+    .hero-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+
+    .btn {
+      border: 1px solid var(--line); border-radius: 10px; color: white; background: #16243d;
+      padding: 10px 15px; font-weight: 700; transition: .2s; display: inline-flex;
+      align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.12); }
+    .btn.primary { border: 0; background: linear-gradient(135deg, var(--primary), #5b8cff); box-shadow: 0 10px 25px rgba(115,103,255,.22); }
+    .btn.success { color: #061b14; background: var(--green); border-color: transparent; }
+    .btn.danger { color: #2b080f; background: var(--red); border-color: transparent; }
+    .btn.ghost { background: transparent; }
+    .btn.small { padding: 7px 10px; font-size: 12px; }
+
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 24px; }
+    .stat, .panel {
+      border: 1px solid var(--line); background: var(--panel); border-radius: var(--radius);
+      box-shadow: 0 15px 45px rgba(0,0,0,.13);
+    }
+    .stat { padding: 19px; }
+    .stat-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .stat-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(115,103,255,.14); color: #a79fff; }
+    .stat b { display: block; font-size: 27px; margin: 4px 0; }
+    .delta { font-size: 11px; color: var(--green); }
+
+    .grid-2 { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(290px, .75fr); gap: 20px; }
+    .panel { padding: 22px; }
+    .panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; gap: 10px; }
+    .panel-title h3 { margin: 0; font-size: 15px; }
+    .panel-title span { color: var(--muted); font-size: 11px; }
+
+    .queue-item {
+      padding: 14px 0; border-bottom: 1px solid var(--line); display: grid;
+      grid-template-columns: 1fr auto; gap: 12px; align-items: center;
+    }
+    .queue-item:last-child { border: 0; }
+    .queue-item h4 { margin: 0 0 4px; font-size: 13px; }
+    .queue-item p { margin: 0; color: var(--muted); font-size: 11px; }
+    .tag {
+      display: inline-block; padding: 3px 8px; border-radius: 100px; font-size: 10px;
+      font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+      background: rgba(115,103,255,.13); color: #aaa3ff;
+    }
+    .tag.pending { color: var(--yellow); background: rgba(251,191,36,.1); }
+    .tag.accepted { color: var(--green); background: rgba(54,211,153,.1); }
+    .tag.rejected { color: var(--red); background: rgba(251,113,133,.1); }
+    .tag.high { color: var(--red); background: rgba(251,113,133,.1); }
+
+    .bar-row { margin: 16px 0; }
+    .bar-label { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    .bar { height: 7px; border-radius: 10px; background: #162239; overflow: hidden; }
+    .bar > i { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg, var(--primary), var(--cyan)); animation: grow 1s ease; }
+    @keyframes grow { from { width: 0; } }
+
+    .page-head { margin-bottom: 22px; }
+    .page-head h2 { margin: 0 0 5px; font-size: 25px; }
+    .page-head p { color: var(--muted); margin: 0; }
+
+    .workspace { display: grid; grid-template-columns: minmax(330px, .9fr) minmax(380px, 1.1fr); gap: 20px; }
+    label { display: block; color: #c6d0e1; font-size: 12px; font-weight: 700; margin: 14px 0 7px; }
+    input, textarea, select {
+      width: 100%; color: var(--text); background: #0b1729; border: 1px solid var(--line);
+      border-radius: 10px; padding: 11px 12px; outline: none; transition: .2s;
+    }
+    textarea { resize: vertical; min-height: 110px; font-family: "DM Mono", monospace; font-size: 12px; line-height: 1.6; }
+    input:focus, textarea:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(115,103,255,.11); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    .analysis-empty { min-height: 455px; display: grid; place-items: center; text-align: center; color: var(--muted); }
+    .radar { width: 90px; height: 90px; margin: auto; border-radius: 50%; border: 1px solid rgba(25,199,213,.3); position: relative; background: radial-gradient(circle, rgba(25,199,213,.15), transparent 60%); }
+    .radar:after { content:""; position:absolute; inset: 12px; border: 1px dashed rgba(115,103,255,.4); border-radius:50%; }
+    .loading .radar { animation: spin 1.2s linear infinite; border-top-color: transparent; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result { display: none; }
+    .result.visible { display: block; animation: appear .3s ease; }
+    .confidence { display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(54,211,153,.06); border: 1px solid rgba(54,211,153,.16); border-radius: 11px; }
+    .score { font-size: 25px; color: var(--green); font-weight: 800; }
+    .diagnosis { margin: 14px 0; padding: 14px; border-left: 3px solid var(--cyan); background: rgba(25,199,213,.05); border-radius: 0 10px 10px 0; }
+    .diagnosis h4 { margin: 0 0 5px; }
+    .diagnosis p { color: var(--muted); margin: 0; }
+    .steps { padding-left: 20px; }
+    .steps li { color: #ccd6e6; margin: 9px 0; }
+    code { font-family: "DM Mono", monospace; color: #8ceaf0; background: #071322; border-radius: 5px; padding: 2px 5px; }
+
+    .filters { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 18px; }
+    .filter { border: 1px solid var(--line); background: transparent; color: var(--muted); padding: 8px 12px; border-radius: 100px; font-size: 11px; }
+    .filter.active { color: white; border-color: var(--primary); background: rgba(115,103,255,.15); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 780px; }
+    th { color: #7588a4; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; text-align: left; padding: 11px; border-bottom: 1px solid var(--line); }
+    td { padding: 13px 11px; border-bottom: 1px solid var(--line); color: #ccd5e5; font-size: 12px; }
+    tbody tr { transition: .2s; }
+    tbody tr:hover { background: rgba(255,255,255,.022); }
+    .case-name { color: white; font-weight: 700; }
+    .table-action { border: 0; background: transparent; color: var(--cyan); font-weight: 700; }
+
+    .review-modal {
+      position: fixed; inset: 0; background: rgba(2, 7, 16, .78); z-index: 100;
+      display: none; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(8px);
+    }
+    .review-modal.open { display: flex; }
+    .modal-card {
+      width: min(720px, 100%); max-height: 90vh; overflow: auto; background: #0c182a;
+      border: 1px solid var(--line); border-radius: 20px; padding: 24px; box-shadow: var(--shadow);
+      animation: appear .25s ease;
+    }
+    .modal-head { display: flex; justify-content: space-between; gap: 15px; }
+    .modal-head h3 { margin: 0; }
+    .close { background: transparent; color: var(--muted); border: 0; font-size: 22px; }
+    .review-block { background: #081423; border-radius: 12px; padding: 14px; margin: 14px 0; border: 1px solid var(--line); }
+    .review-block small { color: var(--cyan); font-weight: 800; text-transform: uppercase; }
+    .review-block p { color: #c4cfde; white-space: pre-line; }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+
+    .toast {
+      position: fixed; right: 24px; bottom: 24px; z-index: 150; padding: 13px 17px;
+      border-radius: 11px; color: white; background: #17263f; border: 1px solid var(--line);
+      box-shadow: var(--shadow); transform: translateY(100px); opacity: 0; transition: .3s;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    .notice {
+      padding: 12px; border-radius: 10px; background: rgba(251,191,36,.07);
+      border: 1px solid rgba(251,191,36,.15); color: #e9ca73; font-size: 11px; margin-top: 14px;
+    }
+
+    @media (max-width: 1050px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .workspace, .grid-2 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+      .sidebar { transform: translateX(-100%); transition: .25s; }
+      .sidebar.open { transform: translateX(0); box-shadow: var(--shadow); }
+      main { margin-left: 0; }
+      .mobile-menu { display: block; }
+      .topbar { padding: 0 18px; height: 68px; }
+      .topbar p, .ai-status { display: none; }
+      .content { padding: 20px 15px 45px; }
+      .stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .stat { padding: 14px; }
+      .stat b { font-size: 22px; }
+      .hero { padding: 22px 18px; }
+      .panel { padding: 17px; }
+      .form-row { grid-template-columns: 1fr; gap: 0; }
+    }
+    @media (max-width: 430px) {
+      .stats { grid-template-columns: 1fr; }
+      .top-actions .avatar { display: none; }
+      .hero-actions .btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="logo">N</div>
+      <div><strong>NetMentor AI</strong><small>College Network Lab</small></div>
+    </div>
+    <div class="nav-title">Workspace</div>
+    <nav class="nav">
+      <button class="active" data-view="dashboard">◫ <span>Dashboard</span></button>
+      <button data-view="troubleshoot">⌁ <span>AI Troubleshooter</span></button>
+      <button data-view="reviews">✓ <span>Human Reviews</span></button>
+      <button data-view="cases">▤ <span>Case Library</span></button>
+    </nav>
+    <div class="nav-title" style="margin-top:20px">Management</div>
+    <nav class="nav">
+      <button data-view="analytics">⌗ <span>Student Analytics</span></button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="review-state"><i class="pulse"></i><strong>Review Guard Active</strong></div>
+      <p>AI suggestions cannot be applied without human approval.</p>
+    </div>
+  </aside>
+
+  <main>
+    <header class="topbar">
+      <button class="mobile-menu" id="mobileMenu">☰</button>
+      <div><h1 id="pageTitle">Network Operations Dashboard</h1><p>Packet Tracer lab intelligence & student progress</p></div>
+      <div class="top-actions">
+        <div class="ai-status"><i class="pulse"></i> AI Engine Online</div>
+        <div class="avatar">AK</div>
+      </div>
+    </header>
+
+    <div class="content">
+      <section class="view active" id="dashboard">
+        <div class="hero">
+          <div class="eyebrow">AI-powered lab assistant</div>
+          <h2>Diagnose faster. Learn deeper.<br>Apply fixes safely.</h2>
+          <p>Packet Tracer symptoms और show-command output analyze करें। हर suggested fix human review queue में जाता है—कोई configuration automatically apply नहीं होती।</p>
+          <div class="hero-actions">
+            <button class="btn primary go-troubleshoot">＋ Start New Diagnosis</button>
+            <button class="btn ghost go-cases">Browse 30+ Cases</button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><div class="stat-head"><span>Total Cases</span><i class="stat-icon">▤</i></div><b id="totalStat">30</b><span class="delta">7 network domains</span></div>
+          <div class="stat"><div class="stat-head"><span>Pending Review</span><i class="stat-icon">⌛</i></div><b id="pendingStat">3</b><span class="delta" style="color:var(--yellow)">Human action required</span></div>
+          <div class="stat"><div class="stat-head"><span>Resolution Rate</span><i class="stat-icon">✓</i></div><b id="rateStat">92%</b><span class="delta">↑ 4.8% this month</span></div>
+          <div class="stat"><div class="stat-head"><span>Active Students</span><i class="stat-icon">♙</i></div><b>148</b><span class="delta">12 labs today</span></div>
+        </div>
+
+        <div class="grid-2">
+          <div class="panel">
+            <div class="panel-title"><h3>Human Review Queue</h3><span>Latest submissions</span></div>
+            <div id="dashboardQueue"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><h3>Issue Distribution</h3><span>Current semester</span></div>
+            <div id="distribution"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="troubleshoot">
+        <div class="page-head"><h2>AI-Assisted Troubleshooter</h2><p>Lab context submit करें; AI likely cause और safe next steps generate करेगा।</p></div>
+        <div class="workspace">
+          <form class="panel" id="diagnosisForm">
+            <div class="panel-title"><h3>Diagnostic Input</h3><span>Required fields *</span></div>
+            <div class="form-row">
+              <div><label for="student">Student Name *</label><input id="student" required placeholder="e.g. Aarav Kumar"></div>
+              <div><label for="lab">Lab / Roll ID *</label><input id="lab" required placeholder="PT-LAB-104"></div>
+            </div>
+            <div class="form-row">
+              <div><label for="category">Issue Category *</label>
+                <select id="category" required>
+                  <option value="VLAN">VLAN</option><option value="DHCP">DHCP</option>
+                  <option value="DNS">DNS</option><option value="Routing">Routing</option>
+                  <option value="ACL">ACL</option><option value="NAT">NAT</option>
+                  <option value="Wireless">Wireless</option>
+                </select>
+              </div>
+              <div><label for="device">Primary Device</label><input id="device" placeholder="e.g. SW1 / R2"></div>
+            </div>
+            <label for="symptom">Observed Symptoms *</label>
+            <textarea id="symptom" required placeholder="Describe ping failure, missing lease, unreachable network..."></textarea>
+            <label for="commandOutput">Show-Command Output *</label>
+            <textarea id="commandOutput" required placeholder="Paste output: show vlan brief, show ip route, show access-lists..."></textarea>
+            <div class="notice">⚠ AI output is advisory. A qualified instructor must review the suggestion before the student applies any configuration.</div>
+            <button class="btn primary" style="width:100%;margin-top:16px" type="submit">✦ Analyze & Save Submission</button>
+          </form>
+
+          <div class="panel" id="analysisPanel">
+            <div class="panel-title"><h3>AI Analysis</h3><span>Human-in-the-loop</span></div>
+            <div class="analysis-empty" id="analysisEmpty">
+              <div><div class="radar"></div><h3>Ready to inspect the network</h3><p>Submit symptoms and command output to generate an evidence-based diagnosis.</p></div>
+            </div>
+            <div class="result" id="result">
+              <div class="confidence"><div class="score" id="confidenceScore">91%</div><div><strong>Diagnostic confidence</strong><br><small style="color:var(--muted)">Based on command-output pattern matching</small></div></div>
+              <div class="diagnosis"><h4 id="resultCause"></h4><p id="resultEvidence"></p></div>
+              <h4>Recommended next steps</h4><ol class="steps" id="resultSteps"></ol>
+              <label for="studentNote">Student Note / Proposed Fix</label>
+              <textarea id="studentNote" placeholder="Optional: explain the change you plan to make..."></textarea>
+              <button class="btn primary" id="sendReview" style="width:100%">Send to Human Review</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="reviews">
+        <div class="page-head"><h2>Human Review Queue</h2><p>Accept, reject, या feedback के साथ revise करें। Review के बिना कोई fix approved नहीं है।</p></div>
+        <div class="panel">
+          <div class="filters" id="reviewFilters">
+            <button class="filter active" data-status="all">All</button>
+            <button class="filter" data-status="pending">Pending</button>
+            <button class="filter" data-status="accepted">Accepted</button>
+            <button class="filter" data-status="rejected">Rejected</button>
+          </div>
+          <div class="table-wrap">
+            <table><thead><tr><th>Submission</th><th>Student</th><th>Category</th><th>Confidence</th><th>Status</th><th>Action</th></tr></thead><tbody id="reviewTable"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="cases">
+        <div class="page-head"><h2>Troubleshooting Case Library</h2><p>VLAN, DHCP, DNS, routing, ACL, NAT और wireless के curated Packet Tracer cases.</p></div>
+        <div class="panel">
+          <div class="filters" id="caseFilters"></div>
+          <div class="table-wrap">
+            <table><thead><tr><th>ID</th><th>Case</th><th>Domain</th><th>Difficulty</th><th>Likely Cause</th></tr></thead><tbody id="caseTable"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="analytics">
+        <div class="page-head"><h2>Student & Lab Analytics</h2><p>Learning performance, recurring errors और intervention signals.</p></div>
+        <div class="stats">
+          <div class="stat"><div class="stat-head"><span>Avg. Diagnosis Time</span></div><b>8m 42s</b><span class="delta">↓ 1m 18s</span></div>
+          <div class="stat"><div class="stat-head"><span>First-Try Success</span></div><b>76%</b><span class="delta">↑ 6%</span></div>
+          <div class="stat"><div class="stat-head"><span>Reviews Completed</span></div><b id="completedStat">18</b><span class="delta">This semester</span></div>
+          <div class="stat"><div class="stat-head"><span>Students at Risk</span></div><b>9</b><span class="delta" style="color:var(--red)">Needs intervention</span></div>
+        </div>
+        <div class="grid-2">
+          <div class="panel"><div class="panel-title"><h3>Competency by Domain</h3><span>Aggregate score</span></div><div id="competency"></div></div>
+          <div class="panel"><div class="panel-title"><h3>Instructor Insights</h3><span>AI summarized</span></div>
+            <div class="review-block"><small>Most recurring error</small><p>Trunk native VLAN mismatch appears in 21% of switching labs.</p></div>
+            <div class="review-block"><small>Recommended intervention</small><p>Assign a short subnetting and wildcard-mask refresher before the next ACL lab.</p></div>
+            <div class="review-block"><small>Positive trend</small><p>DHCP troubleshooting accuracy improved 14% after guided show-command practice.</p></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="review-modal" id="reviewModal">
+  <div class="modal-card">
+    <div class="modal-head"><div><div class="eyebrow">Instructor verification</div><h3 id="modalTitle">Review Submission</h3></div><button class="close" id="closeModal">×</button></div>
+    <div class="review-block"><small>Symptoms & evidence</small><p id="modalEvidence"></p></div>
+    <div class="review-block"><small>AI suggested diagnosis</small><p id="modalDiagnosis"></p></div>
+    <label for="reviewNote">Reviewer Feedback</label>
+    <textarea id="reviewNote" placeholder="Explain your decision or recommend corrections..."></textarea>
+    <div class="modal-actions">
+      <button class="btn danger" id="rejectBtn">Reject</button>
+      <button class="btn ghost" id="reviseBtn">Request Revision</button>
+      <button class="btn success" id="acceptBtn">Accept Fix</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  const cases = [
+    ["PT-001","Access port assigned to wrong VLAN","VLAN","Beginner","Incorrect switchport access VLAN"],
+    ["PT-002","Inter-VLAN communication failure","VLAN","Intermediate","Router subinterface missing dot1Q encapsulation"],
+    ["PT-003","Trunk not forwarding VLAN 30","VLAN","Intermediate","VLAN excluded from trunk allowed list"],
+    ["PT-004","Native VLAN mismatch warning","VLAN","Beginner","Different native VLAN on trunk endpoints"],
+    ["PT-005","VLAN present but ports inactive","VLAN","Beginner","VLAN not created in local VLAN database"],
+    ["PT-006","PC receives APIPA address","DHCP","Beginner","DHCP server unreachable or pool inactive"],
+    ["PT-007","Remote subnet gets no DHCP lease","DHCP","Intermediate","Missing ip helper-address"],
+    ["PT-008","Duplicate address warning","DHCP","Intermediate","Default gateway not excluded from pool"],
+    ["PT-009","Wrong gateway delivered by DHCP","DHCP","Beginner","Incorrect default-router pool option"],
+    ["PT-010","DHCP pool exhausted","DHCP","Intermediate","Subnet mask creates insufficient lease range"],
+    ["PT-011","Names fail but IP ping works","DNS","Beginner","Client has incorrect DNS server address"],
+    ["PT-012","Internal hostname unresolved","DNS","Beginner","Missing or incorrect DNS A record"],
+    ["PT-013","DNS queries timeout across VLANs","DNS","Intermediate","ACL blocks UDP/TCP port 53"],
+    ["PT-014","Router lacks remote network path","Routing","Beginner","Static route missing"],
+    ["PT-015","Static route installed incorrectly","Routing","Intermediate","Wrong next-hop address"],
+    ["PT-016","OSPF neighbor not forming","Routing","Advanced","Area mismatch or passive interface"],
+    ["PT-017","RIP route absent","Routing","Intermediate","Network statement missing"],
+    ["PT-018","Default route not propagated","Routing","Advanced","OSPF default-information originate absent"],
+    ["PT-019","Valid web traffic denied","ACL","Intermediate","ACL statement order shadows permit rule"],
+    ["PT-020","ACL has no effect","ACL","Beginner","ACL applied to wrong interface or direction"],
+    ["PT-021","Single host block affects subnet","ACL","Intermediate","Incorrect wildcard mask"],
+    ["PT-022","Return traffic unexpectedly blocked","ACL","Advanced","Overly restrictive extended ACL"],
+    ["PT-023","Inside clients cannot reach internet","NAT","Intermediate","Inside/outside interfaces not marked"],
+    ["PT-024","NAT translations remain empty","NAT","Intermediate","NAT ACL does not match inside local subnet"],
+    ["PT-025","PAT overload fails for second client","NAT","Advanced","Overload keyword missing"],
+    ["PT-026","Static NAT maps wrong server","NAT","Intermediate","Incorrect inside local address"],
+    ["PT-027","Wireless client cannot associate","Wireless","Beginner","SSID mismatch"],
+    ["PT-028","Correct SSID but auth fails","Wireless","Intermediate","WPA2 key/security mode mismatch"],
+    ["PT-029","Wireless client joins but no IP","Wireless","Intermediate","DHCP path or wireless VLAN misconfigured"],
+    ["PT-030","AP has weak/intermittent connectivity","Wireless","Intermediate","Channel interference or coverage issue"],
+    ["PT-031","Guest Wi-Fi reaches private LAN","Wireless","Advanced","Guest ACL/isolation policy missing"],
+    ["PT-032","Router-on-a-stick VLAN 20 fails","VLAN","Intermediate","Subinterface shutdown or wrong VLAN tag"],
+    ["PT-033","OSPF routes learned but unreachable","Routing","Advanced","Interface addressing/mask inconsistency"],
+    ["PT-034","NAT works only for one subnet","NAT","Advanced","Source ACL excludes secondary LAN"]
+  ];
+
+  const diagnosisMap = {
+    VLAN: {cause:"Likely VLAN or trunk configuration mismatch", evidence:"Port membership, VLAN existence, and trunk allowed/native settings do not appear aligned.", steps:["Run <code>show vlan brief</code> and verify the access port membership.","Run <code>show interfaces trunk</code> on both trunk endpoints.","Confirm VLAN exists locally and is included in the trunk allowed list.","Prepare the corrected access/trunk command, then wait for instructor approval."]},
+    DHCP: {cause:"DHCP request path or pool configuration issue", evidence:"The client lease symptom suggests an inactive/exhausted pool, incorrect scope, or missing relay.", steps:["Check <code>show ip dhcp pool</code> and <code>show ip dhcp binding</code>.","Verify excluded addresses, network mask, and default-router options.","For remote clients, verify <code>ip helper-address</code> on the client-facing SVI/interface.","Renew the lease only after review approval."]},
+    DNS: {cause:"DNS address, record, or reachability failure", evidence:"Name-resolution behavior indicates that DNS service or port 53 reachability should be verified.", steps:["Ping the DNS server by IP from the affected endpoint.","Verify the client DNS address with <code>ipconfig /all</code>.","Check the DNS A record and service state.","Inspect ACLs for UDP and TCP port 53 before proposing a change."]},
+    Routing: {cause:"Missing or inconsistent routing information", evidence:"The route/output pattern suggests a missing path, wrong next hop, or dynamic-protocol adjacency problem.", steps:["Inspect <code>show ip route</code> for the destination prefix.","Confirm interface state and addressing with <code>show ip interface brief</code>.","Validate static next-hop or dynamic routing network/area statements.","Use traceroute to identify the last reachable hop."]},
+    ACL: {cause:"ACL logic, wildcard, placement, or direction issue", evidence:"Traffic behavior is consistent with a shadowed rule or an ACL attached at the wrong location.", steps:["Run <code>show access-lists</code> and inspect match counters.","Review rule order and implicit deny behavior.","Verify wildcard masks and protocol/port selection.","Confirm interface and inbound/outbound direction before changing the ACL."]},
+    NAT: {cause:"NAT classification or interface-role issue", evidence:"Translations are absent or incomplete, commonly due to NAT ACL mismatch or missing inside/outside roles.", steps:["Inspect <code>show ip nat translations</code> and statistics.","Verify <code>ip nat inside</code> and <code>ip nat outside</code> interface roles.","Check that the NAT ACL matches the inside local subnet.","Confirm overload/static mapping syntax and routing to the outside network."]},
+    Wireless: {cause:"Wireless association, security, or VLAN/DHCP issue", evidence:"The symptom indicates SSID/authentication mismatch or failure after association.", steps:["Verify SSID, WPA2 mode, and pre-shared key on client and AP.","Confirm association state before checking Layer 3 connectivity.","Check AP switchport VLAN and DHCP reachability.","Review channel/coverage only after configuration parity is confirmed."]}
+  };
+
+  let submissions = JSON.parse(localStorage.getItem("netmentor_submissions") || "null") || [
+    {id:1001, student:"Meera Singh", lab:"PT-LAB-204", category:"VLAN", symptom:"PC in VLAN 20 cannot ping its gateway.", output:"show vlan brief: Fa0/7 listed under VLAN 10", cause:"Access port assigned to incorrect VLAN", evidence:"Fa0/7 is in VLAN 10 while the endpoint belongs to VLAN 20.", confidence:96, status:"pending", note:"Move Fa0/7 to access VLAN 20."},
+    {id:1002, student:"Rohan Das", lab:"PT-LAB-181", category:"DHCP", symptom:"Remote VLAN receives 169.254.x.x.", output:"SVI output contains no helper address.", cause:"Missing DHCP relay address", evidence:"Broadcast DHCP requests cannot reach the server subnet.", confidence:94, status:"pending", note:"Add approved helper address to client SVI."},
+    {id:1003, student:"Nisha Patel", lab:"PT-LAB-165", category:"ACL", symptom:"HTTP remains blocked after permit statement.", output:"ACL deny ip any any appears before HTTP permit.", cause:"ACL statement order shadows permit", evidence:"The earlier deny matches traffic before the later permit.", confidence:98, status:"accepted", note:"Rebuild ACL with specific permits first."},
+    {id:1004, student:"Kabir Shah", lab:"PT-LAB-172", category:"NAT", symptom:"No translations generated.", output:"NAT ACL permits 192.168.20.0 but LAN is 192.168.10.0.", cause:"NAT source ACL subnet mismatch", evidence:"Actual inside source does not match the NAT ACL.", confidence:97, status:"rejected", note:"Correct source ACL network."}
+  ];
+  let draft = null, activeReviewId = null, reviewFilter = "all";
+
+  const save = () => localStorage.setItem("netmentor_submissions", JSON.stringify(submissions));
+  const esc = s => String(s || "").replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+  const statusTag = s => `<span class="tag ${s}">${s}</span>`;
+
+  function toast(message) {
+    const el = document.getElementById("toast");
+    el.textContent = message; el.classList.add("show");
+    setTimeout(() => el.classList.remove("show"), 2800);
+  }
+
+  function navigate(id) {
+    document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === id));
+    document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === id));
+    const titles = {dashboard:"Network Operations Dashboard",troubleshoot:"AI Troubleshooter",reviews:"Human Review Console",cases:"Troubleshooting Case Library",analytics:"Student Analytics"};
+    document.getElementById("pageTitle").textContent = titles[id];
+    document.getElementById("sidebar").classList.remove("open");
+    window.scrollTo(0,0);
+  }
+
+  document.querySelectorAll(".nav button").forEach(b => b.onclick = () => navigate(b.dataset.view));
+  document.querySelectorAll(".go-troubleshoot").forEach(b => b.onclick = () => navigate("troubleshoot"));
+  document.querySelectorAll(".go-cases").forEach(b => b.onclick = () => navigate("cases"));
+  document.getElementById("mobileMenu").onclick = () => document.getElementById("sidebar").classList.toggle("open");
+
+  function renderCases(filter="All") {
+    const categories = ["All","VLAN","DHCP","DNS","Routing","ACL","NAT","Wireless"];
+    document.getElementById("caseFilters").innerHTML = categories.map(c => `<button class="filter ${c===filter?"active":""}" data-case="${c}">${c}</button>`).join("");
+    document.getElementById("caseTable").innerHTML = cases.filter(c => filter==="All" || c[2]===filter).map(c => `
+      <tr><td><code>${c[0]}</code></td><td class="case-name">${c[1]}</td><td><span class="tag">${c[2]}</span></td><td>${c[3]}</td><td>${c[4]}</td></tr>`).join("");
+    document.querySelectorAll("[data-case]").forEach(b => b.onclick = () => renderCases(b.dataset.case));
+  }
+
+  function renderReviews() {
+    const list = submissions.filter(s => reviewFilter === "all" || s.status === reviewFilter);
+    document.getElementById("reviewTable").innerHTML = list.length ? list.slice().reverse().map(s => `
+      <tr><td><span class="case-name">${esc(s.lab)}</span><br><small>#${s.id}</small></td>
+      <td>${esc(s.student)}</td><td><span class="tag">${esc(s.category)}</span></td>
+      <td>${s.confidence}%</td><td>${statusTag(s.status)}</td>
+      <td><button class="table-action" onclick="openReview(${s.id})">Review →</button></td></tr>`).join("") :
+      `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:35px">No submissions in this status.</td></tr>`;
+    const pending = submissions.filter(s => s.status === "pending").length;
+    document.getElementById("pendingStat").textContent = pending;
+    document.getElementById("completedStat").textContent = submissions.filter(s => s.status !== "pending").length;
+  }
+
+  function renderDashboard() {
+    const recent = submissions.slice().reverse().slice(0,4);
+    document.getElementById("dashboardQueue").innerHTML = recent.map(s => `
+      <div class="queue-item"><div><h4>${esc(s.lab)} · ${esc(s.student)}</h4>
+      <p>${esc(s.cause)}</p></div><div>${statusTag(s.status)} ${s.status==="pending"?`<button class="btn small" onclick="openReview(${s.id})">Review</button>`:""}</div></div>`).join("");
+    const distributionData = [["VLAN",82],["Routing",71],["DHCP",64],["ACL",57],["NAT",48],["Wireless",40],["DNS",34]];
+    document.getElementById("distribution").innerHTML = distributionData.map(x => `<div class="bar-row"><div class="bar-label"><span>${x[0]}</span><b>${x[1]}</b></div><div class="bar"><i style="width:${x[1]}%"></i></div></div>`).join("");
+  }
+
+  document.getElementById("competency").innerHTML = [["Switching & VLAN",84],["IP Routing",73],["Network Services",78],["Security & ACL",65],["NAT",69],["Wireless",81]].map(x =>
+    `<div class="bar-row"><div class="bar-label"><span>${x[0]}</span><b>${x[1]}%</b></div><div class="bar"><i style="width:${x[1]}%"></i></div></div>`).join("");
+
+  document.getElementById("diagnosisForm").onsubmit = function(e) {
+    e.preventDefault();
+    const panel = document.getElementById("analysisEmpty");
+    panel.classList.add("loading");
+    panel.innerHTML = `<div><div class="radar"></div><h3>Analyzing topology evidence...</h3><p>Comparing symptoms with the troubleshooting knowledge base.</p></div>`;
+    document.getElementById("result").classList.remove("visible");
+    setTimeout(() => {
+      const category = document.getElementById("category").value;
+      const data = diagnosisMap[category];
+      const output = document.getElementById("commandOutput").value.toLowerCase();
+      let confidence = 87 + Math.floor(Math.random()*9);
+      if (output.includes("show") || output.includes("interface") || output.includes("route")) confidence += 2;
+      confidence = Math.min(confidence, 98);
+      draft = {
+        id: Date.now(), student: document.getElementById("student").value.trim(),
+        lab: document.getElementById("lab").value.trim(), category,
+        symptom: document.getElementById("symptom").value.trim(),
+        output: document.getElementById("commandOutput").value.trim(),
+        cause:data.cause, evidence:data.evidence, confidence, status:"pending", note:""
+      };
+      document.getElementById("confidenceScore").textContent = confidence + "%";
+      document.getElementById("resultCause").textContent = data.cause;
+      document.getElementById("resultEvidence").textContent = data.evidence;
+      document.getElementById("resultSteps").innerHTML = data.steps.map(s => `<li>${s}</li>`).join("");
+      panel.style.display = "none";
+      document.getElementById("result").classList.add("visible");
+      toast("Analysis complete. Submit it for human review.");
+    }, 1100);
+  };
+
+  document.getElementById("sendReview").onclick = () => {
+    if (!draft) return;
+    draft.note = document.getElementById("studentNote").value.trim();
+    submissions.push(draft); save(); renderReviews(); renderDashboard();
+    toast("Saved successfully and sent to human review.");
+    draft = null;
+    document.getElementById("diagnosisForm").reset();
+    document.getElementById("result").classList.remove("visible");
+    const empty = document.getElementById("analysisEmpty");
+    empty.style.display = "grid"; empty.classList.remove("loading");
+    empty.innerHTML = `<div><div class="radar"></div><h3>Ready to inspect the network</h3><p>Submit symptoms and command output to generate an evidence-based diagnosis.</p></div>`;
+    setTimeout(() => navigate("reviews"), 500);
+  };
+
+  window.openReview = function(id) {
+    const s = submissions.find(x => x.id === id); if (!s) return;
+    activeReviewId = id;
+    document.getElementById("modalTitle").textContent = `${s.lab} · ${s.student}`;
+    document.getElementById("modalEvidence").textContent = `${s.symptom}\n\nCommand output:\n${s.output}`;
+    document.getElementById("modalDiagnosis").textContent = `${s.cause}\n\n${s.evidence}\n\nProposed note: ${s.note || "No student note."}`;
+    document.getElementById("reviewNote").value = s.reviewFeedback || "";
+    document.getElementById("reviewModal").classList.add("open");
+  };
+
+  function decide(status) {
+    const s = submissions.find(x => x.id === activeReviewId); if (!s) return;
+    s.status = status;
+    s.reviewFeedback = document.getElementById("reviewNote").value.trim();
+    s.reviewedAt = new Date().toISOString();
+    save(); renderReviews(); renderDashboard();
+    document.getElementById("reviewModal").classList.remove("open");
+    toast(status === "accepted" ? "Fix accepted by human reviewer." : status === "rejected" ? "Fix rejected and saved." : "Revision requested; case remains pending.");
+  }
+  document.getElementById("acceptBtn").onclick = () => decide("accepted");
+  document.getElementById("rejectBtn").onclick = () => decide("rejected");
+  document.getElementById("reviseBtn").onclick = () => decide("pending");
+  document.getElementById("closeModal").onclick = () => document.getElementById("reviewModal").classList.remove("open");
+  document.getElementById("reviewModal").onclick = e => { if (e.target.id === "reviewModal") e.currentTarget.classList.remove("open"); };
+
+  document.querySelectorAll("#reviewFilters .filter").forEach(b => b.onclick = () => {
+    reviewFilter = b.dataset.status;
+    document.querySelectorAll("#reviewFilters .filter").forEach(x => x.classList.toggle("active", x === b));
+    renderReviews();
+  });
+
+  renderCases();
+  renderReviews();
+  renderDashboard();
+  document.getElementById("totalStat").textContent = cases.length;
+</script>
+</body>
+</html>
